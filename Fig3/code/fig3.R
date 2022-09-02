@@ -1,0 +1,172 @@
+# data wrangling
+library(tidyverse)
+library(janitor)
+library(dplyr)
+
+# other plotting
+library(ggbeeswarm)
+library(ggpubr)
+library(cowplot)
+library(survminer)
+library(gridExtra)
+library(grid)
+library(ggtext)
+library(ZamanianLabThemes)
+
+# misc
+library(lubridate)
+library(conflicted)
+library(magrittr)
+library(Hmisc)
+library(broom)
+
+#PDF import
+library(magick)
+library(pdftools)
+library(grImport2)
+
+
+library(here)
+
+conflict_prefer("filter", "dplyr")
+
+#set working directory
+
+setwd<- here()
+
+#-------------------------------read in  data----------------------------------------
+
+RBA.data <- readRDS("../data/RBA.rds")
+
+#----------------------------------set theme------------------------------------------- 
+aesthetic <- 
+  theme_zlab() +
+  theme(
+    panel.grid.major.y = element_line(),
+    axis.text.x = element_markdown(angle = 45, hjust = 1, face="plain",size=10),
+    axis.text.y = element_text(face = "plain", size = 10),
+    strip.text.x = element_markdown(size=10),
+    strip.text.y = element_markdown(size=12),
+    strip.text = ggplot2::element_text(face = "plain", size = 10),
+    axis.title.y = element_text(size=12, face= "plain"))
+
+#------------------------------------Ring aversion--------------------------------------
+
+#stats
+stats<-compare_means(attempts~strain, data = RBA.data, group.by= "compound",
+                     method = "t.test", ref.group = "N2")
+
+stats$p.signif<- factor(stats$p.signif, levels=c("ns","*","**","***","****"),labels= c("","*","**","***","***"))
+
+stats2<-compare_means(attempts~strain, data = RBA.data, group.by= "compound",
+                     method = "t.test", ref.group = "*gar-3(gk305)*")
+
+stats2$p.signif<- factor(stats2$p.signif, levels=c("ns","*","**","***","****"),labels= c("","*","**","***","***"))
+
+
+#plot
+rba_box <- RBA.data%>%
+  ggplot(aes(x = strain, y = attempts, color = strain)) +
+  facet_grid(cols=vars(compound))+
+  scale_y_continuous(limits = c(-2, 9),breaks = seq(0, 6, 2))+ 
+  geom_beeswarm(alpha=.8, size=1,groupOnX = TRUE, stat= "identity", shape = 18) +
+  labs(x = "", y = "Reversals") +
+  stat_pvalue_manual(
+    stats, x="group2", y.position = 7,
+    label = "p.signif")+
+  stat_pvalue_manual(
+    stats2, x="group2", y.position = 8,
+    label = "p.signif",color="grey")+
+  stat_summary(fun="mean")+
+  scale_color_manual(values = c("black", "gray", "orange"))+
+  aesthetic
+
+
+rba_box
+
+
+#Ring aversion schematic 
+
+illust.hb <- image_read_pdf("../images/Aversion_Schematic.pdf", density = 600)
+#illust.hb <- image_read_pdf("../images/fig2.pdf", density = 600)
+Fig3a <- ggdraw() +
+  draw_image(illust.hb, scale = 1)
+
+###--------------------------------------Aldicarb paralysis------------------------------
+#update theme
+aesthetic <- 
+  theme(
+    panel.grid.major.y = element_line(),
+    panel.grid.major.x = element_line(),
+    axis.text.x = element_markdown(angle = 0, hjust = 1, face="plain",size=10),
+    axis.text.y = element_text(face = "plain", size = 10),
+    strip.text.x = element_markdown(size=10),
+    strip.text.y = element_markdown(size=12),
+    strip.text = ggplot2::element_text(face = "plain", size = 10),
+    legend.text = element_markdown(size=10),
+    axis.title.y = element_text(size=12, face= "plain"),
+    axis.title.x = element_text(size=12, face= "plain"))
+
+#import data
+km <- readRDS("../data/Aldicarb.rds")
+
+#stats
+stat.table <- pairwise_survdiff(Surv(Time, Status)  ~ Strain, p.adjust.method = "none", data = filter(km, Date == c("2019-01-03", "2019-01-04", "2019-01-08"), Strain != "ZAM11"))
+stat.table
+
+# Symbolic number coding
+stat<-symnum(stat.table$p.value, cutpoints = c(0, 0.0001, 0.001, 0.01, 0.05, 0.1, 1),
+             symbols = c("***", "***", "**", "*", "", " "),
+             abbr.colnames = FALSE, na = "")
+stat
+#inital plot
+fit <- survfit(Surv(Time, Status)  ~ Strain, data = filter(km, Date == c("2019-01-03", "2019-01-04", "2019-01-08")))
+km.plot <- ggsurvplot(fit, 
+                      data = km,
+                      conf.int = TRUE,
+                      xlab=("Minutes"),
+                      break.time.by = 20,
+                      legend.title="",
+                      legend.labs = c("N2","*gar-3(gk305)*","*gar-3(gk305);<br>myo-3p::Bma-gar-3*"),
+                      palette =  c("black", "gray", "#005900"))
+km.plot
+
+
+
+# Statistics ---------------------------------------------------------------------------------------------
+
+stat.table <- pairwise_survdiff(Surv(Time, Status)  ~ Strain, p.adjust.method = "none", data = filter(km, Date == c("2019-01-03", "2019-01-04", "2019-01-08"), Strain != "ZAM11"))
+stat.table <- as.data.frame(stat.table$p.value)
+tt <- ttheme_default(colhead=list(fg_params = list(parse=TRUE)))
+tbl <- tableGrob(stat.table, rows=NULL, theme=tt)
+
+
+#kaplan-meier plot with aesthetics and stats 
+
+km.p <- km.plot$plot + 
+  geom_text(data = tibble(time = c(30, 75), surv = 1, label = c('***', '*')),
+            aes(label = label),
+            size = 6) +  
+  aesthetic +
+  labs(x = "Minutes") +
+  theme(plot.margin = margin(0, 30, 60, 30, unit = "pt"))
+
+km.p
+
+#Aldicarb paralysis schematic 
+
+illust.hb2 <- image_read_pdf("../images/Aldicarb_Schematic.pdf", density = 600)
+
+Fig3c <- ggdraw() +
+  draw_image(illust.hb2, scale = 1)
+
+
+#------------------------------------Figure 3------------------------------------------
+cowplot_schematics <- plot_grid(Fig3a, Fig3c,  labels = c('A', 'C'), label_size = 16, ncol=2)
+
+cowplot_plots <- plot_grid(rba_box, km.p,  labels = c('B', 'D'), label_size = 16, ncol=2, align= "h", axis="b")
+
+combine<-plot_grid(cowplot_schematics, cowplot_plots, nrow =2, rel_widths=c(1,2), rel_heights=c(.5,1))
+
+save_plot("../figures/plots/fig3.pdf", combine, base_height = 8, base_width = 14)
+
