@@ -51,7 +51,7 @@ ct.data <- readRDS("../data/brugia_celltox.rds")
 
 #---------------------------------Phylogenetics----------------------------------------- 
 #read in tree
-nwk<- read.newick(here( "../data/phylo/GAR.combined_final.aln.contree"))
+nwk<- read.newick(here( "Fig1/data/phylo/GAR.combined_final.aln.contree"))
 nwk<- ape::root(nwk, node = 123)
 nwk <- tree_subset(nwk, node = 123, levels_back = 0) 
 
@@ -98,6 +98,7 @@ tree_data.nr$gene_ortholog <- str_replace(tree_data.nr$gene_ortholog, "TYRA-3", 
 phylo_plot<- ggtree(nwk.nr) %<+% tree_data.nr  + 
   geom_tiplab(aes(label=gene_ortholog),  hjust=-.2,size= 2.8, color='brown') +
   geom_tippoint(aes(colour=species), size = 2.8) +
+  geom_nodelab(aes(label=label),size=2.5, hjust=1.5, vjust=-.8)+
   xlim(0,3.2)+
   scale_color_manual(values = c("#C2DDC7","#dd0d2c","#f4c33a","#E2B8A3", "#749092", "#72502E" , "#747B7D","#310A15"))+
   theme(legend.position= "bottom",legend.title=element_blank(), 
@@ -469,5 +470,5 @@ fig1_mf<-plot_grid(motility.plot,Figill,ct.data.plot,labels = c('E','','F'), lab
 
 fig1<-plot_grid(fig1_row1, fig1_adult, fig1_mf, labels = c('','',''), nrow=3, rel_heights= c(0.9,1.5,2),align = "vh", axis="rl")
 
-save_plot("./plots/fig1_red.pdf", fig1, base_height = 16, base_width = 12)
+save_plot("../plots/fig1_boot.pdf", fig1, base_height = 16, base_width = 12)
 
